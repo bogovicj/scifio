@@ -46,6 +46,7 @@ import io.scif.util.FormatTools;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 
 import net.imagej.axis.Axes;
 import net.imglib2.Interval;
@@ -76,6 +77,8 @@ public class NRRDFormat extends AbstractFormat {
 
 		// -- Fields --
 
+		private static final long serialVersionUID = 8081104052373973149L;
+
 		/** Location of data file, if the current extension is 'nhdr'. */
 		private Location dataFile;
 
@@ -89,6 +92,12 @@ public class NRRDFormat extends AbstractFormat {
 		private io.scif.Reader helper;
 
 		private String[] pixelSizes;
+
+		private String[] spaceUnits;
+
+		private double[][] spaceDirections;
+
+		private String[] kinds;
 
 		private boolean lookForCompanion = true;
 
@@ -136,6 +145,37 @@ public class NRRDFormat extends AbstractFormat {
 			this.pixelSizes = pixelSizes;
 		}
 
+		public double[][] getSpaceDirection() {
+			return spaceDirections;
+		}
+
+		public void setSpaceDirections(final String[] directions ) {
+			for( int i = 0; i < directions.length; i++ )
+			{
+				directions[i].trim().replaceAll("[()]", "");
+
+			}
+		}
+
+		public String[] getSpaceUnits() {
+			return spaceUnits;
+		}
+
+		public void setSpaceUnits(final String[] units) {
+			this.spaceUnits = Arrays.stream( units )
+					.map( x -> x.replaceAll( "\"", "" ) ).toArray( String[]::new );
+		}
+
+		public String[] getKinds()
+		{
+			return kinds;
+		}
+
+		public void setKinds( String[] kinds )
+		{
+			this.kinds = kinds;
+		}
+
 		public boolean isLookForCompanion() {
 			return lookForCompanion;
 		}
@@ -162,6 +202,14 @@ public class NRRDFormat extends AbstractFormat {
 				iMeta.setAxisTypes(Axes.CHANNEL, Axes.X, Axes.Y);
 				iMeta.setPlanarAxisCount(3);
 			}
+
+			if( spaceUnits != null )
+				for( int i = 0; i < spaceUnits.length; i++ )
+					iMeta.getAxes().get( i ).setUnit( spaceUnits[ i ] );
+
+			iMeta.getTable().put( "kinds", getKinds() );
+			iMeta.getTable().put( "encoding", getEncoding() );
+
 			iMeta.setIndexed(false);
 			iMeta.setFalseColor(false);
 			iMeta.setMetadataComplete(true);
@@ -368,8 +416,19 @@ public class NRRDFormat extends AbstractFormat {
 					else if (key.equals("spacings")) {
 						meta.setPixelSizes(v.split(" "));
 					}
+					else if (key.equals("space directions")) {
+						/* Note: space directions tag will take precedence over spacings 
+						 * if both are present */
+						meta.setSpaceDirections(v.split(" "));
+					}
 					else if (key.equals("byte skip")) {
 						meta.setOffset(Long.parseLong(v));
+					}
+					else if (key.equals("space units")) {
+						meta.setSpaceUnits(v.split(" "));
+					}
+					else if (key.equals("kinds")) {
+						meta.setKinds(v.split(" "));
 					}
 				}
 
@@ -496,6 +555,10 @@ public class NRRDFormat extends AbstractFormat {
 					readPlane(getHandle(), imageIndex, bounds, plane);
 					return plane;
 				}
+//				else if ( meta.getEncoding().equals("gzip"))
+//				{
+//	
+//				}
 				throw new UnsupportedCompressionException("Unsupported encoding: " +
 					meta.getEncoding());
 			}
